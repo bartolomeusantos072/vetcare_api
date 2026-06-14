@@ -1,14 +1,36 @@
 const Pet = require('../model/pet');
 
+// Função auxiliar para montar a mensagem gramatical dinâmica
+const validarCampos = (campos) => {
+  const faltantes = campos
+    .filter(c => !c.valor || (typeof c.valor === 'string' && c.valor.trim() === ''))
+    .map(c => c.nome);
+
+  if (faltantes.length === 0) return null;
+
+  if (faltantes.length === 1) {
+    return `O campo ${faltantes[0]} é obrigatório.`;
+  }
+  
+  const ultimosCampos = faltantes.slice(0, -1).join(", ");
+  const ultimoCampo = faltantes[faltantes.length - 1];
+  return `Os campos ${ultimosCampos} e ${ultimoCampo} são obrigatórios.`;
+};
+
 // 1. Cadastro de novos Pets
 const cadastrarPet = async (req, res) => {
   try {
     const { nome, especie } = req.body;
 
-    // Validação de dados básica de formulário (campos obrigatórios)
-    if (!nome || !especie) {
-      return res.status(400).json({ 
-        errors: [{ msg: "Nome e espécie são obrigatórios." }] 
+    // Executa a validação dinâmica e acumulativa criada por você
+    const erroMensagem = validarCampos([
+      { valor: nome, nome: "Nome" },
+      { valor: especie, nome: "Espécie" }
+    ]);
+
+    if (erroMensagem) {
+      return res.status(400).json({
+        errors: [{ msg: erroMensagem }]
       });
     }
 
@@ -25,11 +47,11 @@ const cadastrarPet = async (req, res) => {
 // 2. Listagem de Pets com suporte a Query String
 const listarPets = async (req, res) => {
   try {
-    const { especie } = req.query; // Captura a query string ?especie=...
+    const { especie } = req.query; // Captura a query string ?especie=[nome da especie]
     let pets;
 
     if (especie) {
-      // Se informou a espécie, filtra na busca do Sequelize
+      // Se informou a espécie, filtra na busca do Sequelize exatamente como exige a prova
       pets = await Pet.findAll({
         where: { especie: especie }
       });

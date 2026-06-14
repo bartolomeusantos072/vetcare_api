@@ -3,26 +3,51 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+// Função auxiliar para montar a mensagem gramatical dinâmica
+const validarCampos = (campos) => {
+  // Filtra apenas os nomes dos campos que vieram vazios ou nulos
+  const faltantes = campos
+    .filter(c => !c.valor || (typeof c.valor === 'string' && c.valor.trim() === ''))
+    .map(c => c.nome);
+
+  if (faltantes.length === 0) return null;
+
+  if (faltantes.length === 1) {
+    return `O campo ${faltantes[0]} é obrigatório.`;
+  }
+  
+  // Se faltarem 2 ou mais, junta com vírgulas e coloca o "e" no último elemento
+  const ultimosCampos = faltantes.slice(0, -1).join(", ");
+  const ultimoCampo = faltantes[faltantes.length - 1];
+  return `Os campos ${ultimosCampos} e ${ultimoCampo} são obrigatórios.`;
+};
+
 // 1. Cadastro de Usuário
 const cadastrarUsuario = async (req, res) => {
   try {
     const { nome, usuario, senha, perfil } = req.body;
 
-    // Validação de campos obrigatórios
-    if (!nome || !usuario || !senha) {
+    // Executa a validação dinâmica e acumulativa
+    const erroMensagem = validarCampos([
+      { valor: nome, nome: "Nome" },
+      { valor: usuario, nome: "Usuário" },
+      { valor: senha, nome: "Senha" }
+    ]);
+
+    if (erroMensagem) {
       return res.status(400).json({
-        errors: [{ msg: "Nome, usuário e senha são obrigatórios." }]
+        errors: [{ msg: erroMensagem }]
       });
     }
 
-    // Validação do tamanho da senha (mínimo 6 caracteres) [cite: 96]
+    // Validação do tamanho da senha (mínimo 6 caracteres)
     if (senha.length < 6) {
       return res.status(400).json({
         errors: [{ msg: "A senha deve ter, pelo menos, 6 caracteres." }]
       });
     }
 
-    // Validação de campo único: Verifica se o usuário já existe [cite: 139, 218]
+    // Validação de campo único: Verifica se o usuário já existe
     const usuarioExistente = await Usuario.findOne({ where: { usuario } });
     if (usuarioExistente) {
       return res.status(400).json({
@@ -30,11 +55,11 @@ const cadastrarUsuario = async (req, res) => {
       });
     }
 
-    // Criptografa a senha antes de salvar no banco [cite: 17]
+    // Criptografa a senha antes de salvar no banco
     const salt = await bcrypt.genSalt(10);
     const senha_hash = await bcrypt.hash(senha, salt);
 
-    // Cria o usuário no banco (se perfil não for enviado, assume o padrão 'recepcao' definido no Model) [cite: 18, 97]
+    // Cria o usuário no banco
     const novoUsuario = await Usuario.create({
       nome,
       usuario,
@@ -42,7 +67,7 @@ const cadastrarUsuario = async (req, res) => {
       perfil: perfil || 'recepcao'
     });
 
-    // Retorna os dados do usuário criado ocultando o hash por segurança [cite: 187, 202]
+    // Retorna os dados do usuário criado ocultando o hash por segurança
     return res.status(201).json({
       id: novoUsuario.id,
       nome: novoUsuario.nome,
@@ -60,10 +85,15 @@ const login = async (req, res) => {
   try {
     const { usuario, senha } = req.body;
 
-    // Validação de campos obrigatórios [cite: 280, 298]
-    if (!usuario || !senha) {
+    // Executa a mesma validação dinâmica para o login
+    const erroMensagem = validarCampos([
+      { valor: usuario, nome: "Usuário" },
+      { valor: senha, nome: "Senha" }
+    ]);
+
+    if (erroMensagem) {
       return res.status(400).json({
-        errors: [{ msg: "Usuario e senha são obrigatórios" }]
+        errors: [{ msg: erroMensagem }]
       });
     }
 
@@ -83,20 +113,19 @@ const login = async (req, res) => {
       });
     }
 
-    // Monta o Payload do Token JWT conforme o padrão visto em aula [cite: 273]
+    // Monta o Payload do Token JWT
     const payload = {
       id: user.id,
       perfil: user.perfil
     };
 
-    // Assina o Token JWT com validade (ex: 1 dia) utilizando a secret do .env [cite: 119]
+    // Assina o Token JWT com validade de 1 dia
     const token = jwt.sign(payload, process.env.JWT_SECRET || 'secret_fallback', {
       expiresIn: '1d'
     });
 
-    // Retorna o formato exato exigido na imagem do print da página 7 [cite: 267, 269, 274]
+    // Retorna o formato exato exigido na imagem do print da página 7
     return res.status(200).json({
-      usuario: user.usuario,
       token: token,
       usuario: {
         id: user.id,
