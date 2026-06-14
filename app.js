@@ -1,22 +1,32 @@
 const express = require('express');
 const helmet = require('helmet');
+const passport = require('passport'); // ADICIONADO: Importação do Passport
 require('dotenv').config();
 
 // Importa a conexão do banco e os modelos/relacionamentos centralizados
 const { sequelize } = require('./model/index');
+
+// IMPORTAÇÃO DAS ROTAS DOS DOMÍNIOS
+const indexRoutes = require('./route/index');
+const petRoutes = require('./route/petRoutes');
+const usuarioRoutes = require('./route/usuarioRoutes');
+const atendimentoRoutes = require('./route/atendimentoRoutes');
+
+
+// IMPORTAÇÃO DO SWAGGER
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./config/swagger-output.json');
 
 const app = express();
 
 // ==========================================
 // 1. CONFIGURAÇÕES DE SEGURANÇA (HELMET)
 // ==========================================
-// Atendendo rigorosamente aos critérios de segurança exigidos na prova:
 app.use(helmet({
-  hidePoweredBy: true, // Remove o cabeçalho X-Powered-By (Oculta o Express)
-  contentSecurityPolicy: true // Mantém a política de segurança padrão exibida nos prints da prova
+  hidePoweredBy: true, 
+  contentSecurityPolicy: true 
 }));
 
-// Adiciona manualmente as políticas específicas exigidas de MIME-Type e Referrer
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -27,11 +37,13 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// ADICIONADO: Inicializa o Passport como middleware global do Express
+app.use(passport.initialize());
+
 // ==========================================
 // 2. CONEXÃO E SINCRONIZAÇÃO DO BANCO DE DADOS
 // ==========================================
-// Aqui acontece a mágica que você mencionou: o Sequelize conecta e cria as tabelas
-sequelize.sync({ force: false }) // 'force: false' para não apagar os dados caso o servidor reinicie
+sequelize.sync({ force: false }) 
   .then(() => {
     console.log('--- Conexão com o banco "vetcare_api" estabelecida com sucesso! ---');
     console.log('--- Tabelas verificadas/criadas com sucesso no MySQL. ---');
@@ -41,11 +53,14 @@ sequelize.sync({ force: false }) // 'force: false' para não apagar os dados cas
   });
 
 // ==========================================
-// 3. ROTAS BASE (Adicionaremos em breve)
+// 3. VINCULAÇÃO DE ROTAS POR DOMÍNIO
 // ==========================================
-// Rota de teste temporária apenas para validação inicial
-app.get('/teste', (req, res) => {
-  res.json({ mensagem: "API VetCare funcionando e protegida!" });
-});
+app.use('/', indexRoutes);          // Domínio do Index (Rota Principal)
+app.use('/pets', petRoutes);        // Domínio dos Pets (Cadastro e Listagem)
+app.use('/usuarios', usuarioRoutes); // Domínio dos Usuários (Cadastro e Login JWT)
+app.use('/atendimentos', atendimentoRoutes);
+
+// Rota oficial da documentação Swagger (Exigência do Módulo 4)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 module.exports = app;
