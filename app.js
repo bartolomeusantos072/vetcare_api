@@ -43,7 +43,7 @@ app.use(passport.initialize());
 // ==========================================
 // 2. CONEXÃO E SINCRONIZAÇÃO DO BANCO DE DADOS
 // ==========================================
-sequelize.sync({ force: false }) 
+sequelize.sync({ alter: true }) // <--- alter: true lê as novas colunas e ENUMs com segurança
   .then(() => {
     console.log('--- Conexão com o banco "vetcare_api" estabelecida com sucesso! ---');
     console.log('--- Tabelas verificadas/criadas com sucesso no MySQL. ---');
