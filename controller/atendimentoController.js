@@ -1,13 +1,38 @@
 const { Atendimento, Pet } = require('../model/index');
 
+// Função auxiliar para montar a mensagem gramatical dinâmica
+const validarCampos = (campos) => {
+  const faltantes = campos
+    .filter(c => !c.valor || (typeof c.valor === 'string' && c.valor.trim() === ''))
+    .map(c => c.nome);
+
+  if (faltantes.length === 0) return null;
+
+  if (faltantes.length === 1) {
+    return `O campo ${faltantes[0]} é obrigatório.`;
+  }
+  
+  const ultimosCampos = faltantes.slice(0, -1).join(", ");
+  const ultimoCampo = faltantes[faltantes.length - 1];
+  return `Os campos ${ultimosCampos} e ${ultimoCampo} são obrigatórios.`;
+};
+
 // 1. Cadastro de Atendimento (POST /atendimentos)
 const cadastrarAtendimento = async (req, res) => {
   try {
     const { data_hora, motivo, pet_id } = req.body;
 
-    // Validação básica de campos obrigatórios
-    if (!data_hora || !motivo || !pet_id) {
-      return res.status(400).json({ errors: [{ msg: "Todos os campos são obrigatórios." }] });
+    // Executa a validação dinâmica acumulativa
+    const erroMensagem = validarCampos([
+      { valor: data_hora, nome: "Data e Hora" },
+      { valor: motivo, nome: "Motivo" },
+      { valor: pet_id, nome: "ID do Pet" }
+    ]);
+
+    if (erroMensagem) {
+      return res.status(400).json({
+        errors: [{ msg: erroMensagem }]
+      });
     }
 
     // Cria o atendimento vinculando o ID do usuário logado extraído do token JWT
@@ -15,7 +40,7 @@ const cadastrarAtendimento = async (req, res) => {
       data_hora,
       motivo,
       pet_id,
-      usuario_id: req.user.id, // Extraído automaticamente do usuário autenticado
+      usuario_id: req.user.id, // Extraído automaticamente do usuário autenticado pelo Passport
       status: 'agendado'       // Força o status padrão de novos cadastros
     });
 
